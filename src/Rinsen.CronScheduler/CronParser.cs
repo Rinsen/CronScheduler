@@ -1,24 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace Rinsen.CronScheduler
 {
     public class CronParser
     {
+        public const string Asterisk = "*";
+        private readonly int[] ValidMinuteSlashes = new[] { 2, 3, 4, 5, 6, 10, 12, 15, 20, 30 };
+        private readonly int[] ValidHourSlashes = { 2, 3, 4, 6, 8, 12 };
+
         private readonly ICronDateTimeService _cronDateTimeService;
-        private const string Asterisk = "*";
+        private readonly IReadOnlyCollection<int> _emptyCollection = new ReadOnlyCollection<int>(new int[0]);
 
         public CronParser(ICronDateTimeService cronDateTimeService)
         {
             _cronDateTimeService = cronDateTimeService;
         }
 
+        /// <summary>
+        /// minute (0 - 59) hour (0 - 23) day of the month (1 - 31) month (1 - 12) day of the week (0 - 6) (Sunday 0 to Saturday 6)
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
         public CronExpression Parse(string expression)
         {
             if (string.IsNullOrEmpty(expression))
             {
                 throw new ArgumentException("Empty expression is not valid", nameof(expression));
+            }
+
+            if (expression.Contains("?") || expression.Contains("L") || expression.Contains("W") || expression.Contains("#"))
+            {
+                throw new ArgumentOutOfRangeException(nameof(expression), expression, "?, L, W and # is not supported in this implementation");
             }
 
             var parts = expression.Split(' ');
@@ -34,54 +49,69 @@ namespace Rinsen.CronScheduler
             var dayOfWeek = parts[4];
 
             string year = Asterisk;
-            if (parts.Length == 5)
+            if (parts.Length == 6)
             {
                 year = parts[5];
             }
 
-            var cronExpression = new CronExpression(_cronDateTimeService, ParseMinutes(minutes), ParseHours(hours), ParseDayOfMonth(dayOfMonth), ParseMonth(month), ParseDayOfWeek(dayOfWeek), ParseYear(year));
+            var cronExpression = new CronExpression(_cronDateTimeService,
+                ParseString(minutes, nameof(minutes), 60, ValidMinuteSlashes),
+                ParseString(hours, nameof(hours), 24 , ValidHourSlashes),
+                ParseString(dayOfMonth, nameof(dayOfMonth), 31),
+                ParseString(month, nameof(month), 12),
+                ParseString(dayOfWeek, nameof(dayOfWeek), 6),
+                ParseString(year, nameof(year), 9999));
 
             return cronExpression;
         }
 
-        private IEnumerable<int> ParseMinutes(string minutes)
+        private IReadOnlyCollection<int> ParseString(string data, string parameterName, int maxValue, int[] validSlashValues = null)
         {
-            if (minutes == Asterisk)
+            if (data == Asterisk)
             {
-                return Enumerable.Empty<int>();
+                return _emptyCollection;
             }
 
-            throw new NotImplementedException();
-        }
-
-        private IEnumerable<int> ParseHours(string hours)
-        {
-            if (hours == Asterisk)
+            if (data.Contains('-'))
             {
-                return Enumerable.Empty<int>();
+                var dataRange = data.Split('-');
+                var start = int.Parse(dataRange[0]);
+                var end = int.Parse(dataRange[1]);
+
+                return Enumerable.Range(start, end - start + 1).ToArray();
             }
 
-            throw new NotImplementedException();
-        }
+            if (data.Contains('/') && validSlashValues != null)
+            {
+                var dataSlash = data.Split('/');
 
-        private IEnumerable<int> ParseDayOfMonth(string dayOfMonth)
-        {
-            throw new NotImplementedException();
-        }
+                if (!dataSlash[0].Equals(Asterisk))
+                    throw new ArgumentOutOfRangeException(parameterName, dataSlash[0], "First part in Slash expression must be Asterix");
 
-        private IEnumerable<int> ParseMonth(string month)
-        {
-            throw new NotImplementedException();
-        }
+                var range = int.Parse(dataSlash[1]);
 
-        private IEnumerable<int> ParseDayOfWeek(string dayOfWeek)
-        {
-            throw new NotImplementedException();
-        }
+                if (!validSlashValues.Contains(range))
+                    throw new ArgumentOutOfRangeException(parameterName, range, $"Only {string.Join(",", validSlashValues)} is valid");
 
-        private IEnumerable<int> ParseYear(string year)
-        {
-            throw new NotImplementedException();
+                var slashRangeResult = new List<int>();
+                var iterator = 0;
+                while (iterator < maxValue)
+                {
+                    slashRangeResult.Add(iterator);
+                    iterator += range;
+                }
+                return slashRangeResult;
+            }
+
+            var dataParts = data.Split(',');
+
+            var result = new List<int>(dataParts.Length);
+            foreach (var dataItem in dataParts)
+            {
+                result.Add(int.Parse(dataItem));
+            }
+
+            return result;
         }
     }
 }

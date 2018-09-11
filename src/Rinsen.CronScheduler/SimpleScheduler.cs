@@ -12,7 +12,7 @@ namespace Rinsen.CronScheduler
 
         public SimpleScheduler(CronParser cronParser)
         {
-
+            _cronParser = cronParser;
         }
 
 
