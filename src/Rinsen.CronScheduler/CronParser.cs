@@ -20,7 +20,7 @@ namespace Rinsen.CronScheduler
         }
 
         /// <summary>
-        /// minute (0 - 59) hour (0 - 23) day of the month (1 - 31) month (1 - 12) day of the week (0 - 6) (Sunday 0 to Saturday 6)
+        /// minute (0 - 59) hour (0 - 23) day of the month (1 - 31) month (1 - 12) day of the week (0 - 6) (Sunday 0 to Saturday 6) Year 
         /// </summary>
         /// <param name="expression"></param>
         /// <returns></returns>

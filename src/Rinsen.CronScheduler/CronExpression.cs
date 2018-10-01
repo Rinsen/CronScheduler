@@ -58,21 +58,125 @@ namespace Rinsen.CronScheduler
         {
             var now = _cronDateTimeService.GetNow();
 
-            if(ShouldRunNow(now)) // Now is not the next time to run
+            if (ShouldRunNow(now)) // Now is not the next time to run
             {
                 // Complicated shit
+                var nextMinute = now.AddMinutes(1);
 
+                if (ShouldRunNow(nextMinute))
+                {
+                    return new DateTime(nextMinute.Year, nextMinute.Month, nextMinute.Day, nextMinute.Hour, nextMinute.Minute, 0).Subtract(now);
+                }
 
+                var nextMinuteMatch = GetNextMatch(nextMinute);
 
+                return nextMinuteMatch?.Subtract(now);
             }
-            else
+
+            var nextMatch = GetNextMatch(now);
+
+            return nextMatch?.Subtract(now);
+        }
+
+        private DateTime? GetNextMatch(DateTime now)
+        {
+            var next = new DateTime(now.Year, 1, 1, 0, 0, 0);
+            var timeUpdated = false;
+
+            // Find the year of next execution
+            if (_years.Any())
             {
-                // Complicated shit
+                var years = _years.Where(m => m > now.Year).ToArray();
 
+                if (!years.Any())
+                {
+                    return null;
+                }
+                else
+                {
+                    next = next.AddYears(years.First() - next.Year);
+                }
 
+                timeUpdated = true;
             }
 
-            return null;
+            if (_months.Any())
+            {
+                var months = _months.Where(m => m > now.Month).ToArray();
+
+                if (!months.Any())
+                {
+                    next = next.AddYears(1);
+                    next = next.AddMonths(_months.First() - 1);
+                }
+                else
+                {
+                    next = next.AddMonths(months.First() - 1);
+                }
+
+                timeUpdated = true;
+            }
+            else if (!timeUpdated)
+            {
+                next = next.AddMonths(now.Month - 1);
+            }
+
+            if (_daysOfMonth.Any())
+            {
+                var daysOfMonth = _daysOfMonth.Where(m => m > now.Day).ToArray();
+
+                if (!daysOfMonth.Any())
+                {
+                    next = next.AddMonths(1);
+                    next = next.AddDays(_daysOfMonth.First() - next.Day);
+                }
+                else
+                {
+                    next = next.AddDays(daysOfMonth.First() - next.Day);
+                }
+
+                timeUpdated = true;
+            }
+            else if (!timeUpdated)
+            {
+                next = next.AddDays(now.Day - 1);
+            }
+
+            if (_hours.Any())
+            {
+                var hours = _hours.Where(m => m > now.Hour).ToArray();
+
+                if (!hours.Any())
+                {
+                    next = next.AddDays(1);
+                    next = next.AddHours(_hours.First());
+                }
+                else
+                {
+                    next = next.AddHours(hours.First());
+                }
+            }
+            else if (!timeUpdated)
+            {
+                next = next.AddHours(now.Hour);
+            }
+
+            if (_minutes.Any())
+            {
+                var minutes = _minutes.Where(m => m > now.Minute).ToArray();
+
+                if (!minutes.Any())
+                {
+                    next = next.AddHours(1);
+                    next = next.AddMinutes(_minutes.First());
+                }
+                else if (!timeUpdated)
+                {
+                    next = next.AddMinutes(minutes.First());
+                }
+            }
+
+            return next;
         }
 
         public bool ShouldRunNow()

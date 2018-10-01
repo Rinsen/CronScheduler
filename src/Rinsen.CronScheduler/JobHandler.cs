@@ -51,7 +51,14 @@ namespace Rinsen.CronScheduler
 
                 while (!_cancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    await Task.Delay(_cronExpression.GetTimeToNext(), _cancellationTokenSource.Token);
+                    var timeToNext = _cronExpression.GetTimeToNext();
+
+                    if (!timeToNext.HasValue)
+                    {
+                        return;
+                    }
+
+                    await Task.Delay((int)timeToNext.Value.TotalMilliseconds, _cancellationTokenSource.Token);
 
                     await _cronJob.RunJob(_cancellationTokenSource.Token);
                 }

@@ -22,7 +22,7 @@ namespace Rinsen.CronScheduler
 
             var timeToNextMatch = cronExpression.GetTimeToNext();
 
-            return Task.Delay(timeToNextMatch, cancellationToken);
+            return Task.Delay((int)timeToNextMatch.Value.TotalMilliseconds, cancellationToken);
         }
 
         public Task WaitForMatch(string expression)
@@ -31,7 +31,7 @@ namespace Rinsen.CronScheduler
 
             var timeToNextMatch = cronExpression.GetTimeToNext();
 
-            return Task.Delay(timeToNextMatch);
+            return Task.Delay((int)timeToNextMatch.Value.TotalMilliseconds);
         }
     }
 }
