@@ -24,7 +24,7 @@ namespace Rinsen.CronScheduler.Tests
         }
 
         [Fact]
-        public void GivenOnlyMinute_WhenMinuteExistInThisHour_ThenGetAFewMinutes()
+        public void GivenOnlyMinute_WhenMinuteExistLaterInThisHour_ThenGetAFewMinutes()
         {
             var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
             cronDateTimeServiceMock.Setup(m => m.GetNow()).Returns(new DateTime(2018, 09, 29, 20, 22, 15));
@@ -164,7 +164,21 @@ namespace Rinsen.CronScheduler.Tests
         }
 
         [Fact]
-        public void GivenOnlyHour_WhenHourIsNowWithinTheSameDay_ThenGetTimeUntilHourMatchInTheNextDay()
+        public void GivenOnlyHour_WhenHourIsNowWithinTheSameDayWithMinutesToGo_ThenGetTimeUntilHourMatchInThisHour()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.Setup(m => m.GetNow()).Returns(new DateTime(2018, 09, 29, 22, 57, 15));
+
+            var cronParser = new CronParser(cronDateTimeServiceMock.Object);
+            var cronExpression = cronParser.Parse("* 22 * * * *");
+
+            var timeToNext = cronExpression.GetTimeToNext();
+
+            Assert.Equal(new TimeSpan(0, 0, 45), timeToNext);
+        }
+
+        [Fact]
+        public void GivenOnlyHour_WhenHourIsNowWithinTheSameDayButTheLastMinute_ThenGetTimeUntilHourMatchInTheNextDay()
         {
             var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
             cronDateTimeServiceMock.Setup(m => m.GetNow()).Returns(new DateTime(2018, 09, 29, 22, 59, 15));
