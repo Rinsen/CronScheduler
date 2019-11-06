@@ -54,10 +54,15 @@ namespace Rinsen.CronScheduler
 
         }
 
-        public TimeSpan? GetTimeToNext()
+        public DateTime? GetNextTimeToRun()
         {
             var now = _cronDateTimeService.GetNow();
 
+            return PrivateGetNextTimeToRun(now);
+        }
+
+        private DateTime? PrivateGetNextTimeToRun(DateTime now)
+        {
             if (ShouldRunNow(now)) // Now is not the next time to run
             {
                 // Complicated shit
@@ -65,17 +70,22 @@ namespace Rinsen.CronScheduler
 
                 if (ShouldRunNow(nextMinute))
                 {
-                    return new DateTime(nextMinute.Year, nextMinute.Month, nextMinute.Day, nextMinute.Hour, nextMinute.Minute, 0).Subtract(now);
+                    return new DateTime(nextMinute.Year, nextMinute.Month, nextMinute.Day, nextMinute.Hour, nextMinute.Minute, 0);
                 }
 
                 var nextMinuteMatch = GetNextMatch(nextMinute);
 
-                return nextMinuteMatch?.Subtract(now);
+                return nextMinuteMatch;
             }
 
-            var nextMatch = GetNextMatch(now);
+            return GetNextMatch(now);
+        }
 
-            return nextMatch?.Subtract(now);
+        public TimeSpan? GetTimeToNext()
+        {
+            var now = _cronDateTimeService.GetNow();
+
+            return PrivateGetNextTimeToRun(now)?.Subtract(now);
         }
 
         private DateTime? GetNextMatch(DateTime now)

@@ -86,7 +86,7 @@ namespace Rinsen.CronScheduler
                 var dataSlash = data.Split('/');
 
                 if (!dataSlash[0].Equals(Asterisk))
-                    throw new ArgumentOutOfRangeException(parameterName, dataSlash[0], "First part in Slash expression must be Asterix");
+                    throw new ArgumentOutOfRangeException(parameterName, dataSlash[0], "First part in Slash expression must be Asterisk");
 
                 var range = int.Parse(dataSlash[1]);
 

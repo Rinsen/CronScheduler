@@ -2,11 +2,11 @@
 
 namespace Rinsen.CronScheduler
 {
-    internal class CronDateTimeService : ICronDateTimeService
+    public class CronDateTimeService : ICronDateTimeService
     {
         public DateTime GetNow()
         {
-            throw new NotImplementedException();
+            return DateTime.Now;
         }
     }
 }
