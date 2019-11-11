@@ -88,7 +88,7 @@ namespace Rinsen.CronScheduler.Tests
                 await actionObject3.DoWorkAsync();
             });
 
-            using (var cancellationTokenSource = new CancellationTokenSource(1000))
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
             {
                 await scheduler.RunAsync(cancellationTokenSource.Token);
             }
