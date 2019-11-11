@@ -18,9 +18,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("30 * * * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(0, 59, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 09, 29, 21, 30, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -32,9 +32,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("30 * * * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(0, 7, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 09, 29, 20, 30, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -116,9 +116,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* 23 * * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(0, 44, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 09, 29, 23, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -130,9 +130,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* 15 * * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(16, 44, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 09, 30, 15, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -214,9 +214,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* * 16 * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(8, 59, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 09, 16, 00, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -228,9 +228,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* * 9 * * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(23, 8, 59, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 10, 09, 00, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -270,9 +270,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* * * 10 * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
             
-            Assert.Equal(new TimeSpan(15, 8, 59, 45), timeToNext);
+            Assert.Equal(new DateTime(2018, 10, 01, 00, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -284,9 +284,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* * * 1 * *");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
             
-            Assert.Equal(new TimeSpan(1, 8, 59, 45), timeToNext);
+            Assert.Equal(new DateTime(2019, 01, 01, 00, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -298,9 +298,9 @@ namespace Rinsen.CronScheduler.Tests
             var cronParser = new CronParser(cronDateTimeServiceMock.Object);
             var cronExpression = cronParser.Parse("* * * * * 2019");
 
-            var timeToNext = cronExpression.GetTimeToNext();
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
 
-            Assert.Equal(new TimeSpan(48, 0, 0), timeToNext);
+            Assert.Equal(new DateTime(2019, 01, 01, 00, 00, 00), nextTimeToRun);
         }
 
         [Fact]
@@ -329,6 +329,34 @@ namespace Rinsen.CronScheduler.Tests
             var timeToNext = cronExpression.GetTimeToNext();
 
             Assert.Equal(new TimeSpan(0, 0, 53), timeToNext);
+        }
+
+        [Fact]
+        public void GivenYearAndTimeOfDay_WhenYearIsNow_ThenGetNextMinuteMatchInThisYear()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.Setup(m => m.GetNow()).Returns(new DateTime(2018, 12, 30, 15, 22, 07));
+
+            var cronParser = new CronParser(cronDateTimeServiceMock.Object);
+            var cronExpression = cronParser.Parse("23 15 * * * 2018");
+
+            var timeToNext = cronExpression.GetNextTimeToRun();
+
+            Assert.Equal(new DateTime(2018, 12, 30, 15, 23, 00), timeToNext);
+        }
+
+        [Fact]
+        public void GivenYearMonthDayAndTimeOfDay_WhenYearIsNow_ThenGetNextMinuteMatchInThisYear()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.Setup(m => m.GetNow()).Returns(new DateTime(2018, 06, 15, 15, 22, 07));
+
+            var cronParser = new CronParser(cronDateTimeServiceMock.Object);
+            var cronExpression = cronParser.Parse("23 15 05 08 * 2018");
+
+            var nextTimeToRun = cronExpression.GetNextTimeToRun();
+
+            Assert.Equal(new DateTime(2018, 08, 05, 15, 23, 00), nextTimeToRun);
         }
     }
 }

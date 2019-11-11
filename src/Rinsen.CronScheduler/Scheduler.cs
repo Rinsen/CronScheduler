@@ -14,6 +14,7 @@ namespace Rinsen.CronScheduler
         private readonly CronParser _cronParser;
         private readonly ICronDateTimeService _cronDateTimeService;
         private readonly ILogger<Scheduler> _logger;
+        private readonly TimeSpan MINUTE = new TimeSpan(0, 1, 0);
 
         public Scheduler(CronParser cronParser,
             ICronDateTimeService cronDateTimeService,
@@ -71,15 +72,21 @@ namespace Rinsen.CronScheduler
                         lowestIds.Add(scheduledTask.Id);
                     }
                 }
+
                 var timeToWait = lowestNextTimeToRun.Subtract(_cronDateTimeService.GetNow());
 
-                await Task.Delay((int)timeToWait.TotalMilliseconds, cancellationToken).ContinueWith(task => {
+                var continueExecution = await Task.Delay((int)Math.Min(int.MaxValue, timeToWait.TotalMilliseconds), cancellationToken).ContinueWith(task => {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        return;
+                        return false;
                     }
+                    return true;
                 });
 
+                if (!continueExecution)
+                    return;
+
+                var startTime = _cronDateTimeService.GetNow();
                 foreach (var scheduledTask in _scheduledTasks.Where(m => lowestIds.Contains(m.Id)))
                 {
                     try
@@ -98,6 +105,10 @@ namespace Rinsen.CronScheduler
                     {
                         _logger.LogError(e, "Failed to execute action");
                     }
+                }
+                if (_cronDateTimeService.GetNow() - startTime > MINUTE)
+                {
+                    _logger.LogWarning("Execution took more than one minute");
                 }
             }
         }

@@ -90,99 +90,102 @@ namespace Rinsen.CronScheduler
 
         private DateTime? GetNextMatch(DateTime now)
         {
-            var next = new DateTime(now.Year, 1, 1, 0, 0, 0);
-            var timeUpdated = false;
-
+            // If no changes is required this is the next time of execution
+            var next = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
+            
             // Find the year of next execution
             if (_years.Any())
             {
-                var years = _years.Where(m => m > now.Year).ToArray();
+                var years = _years.Where(m => m >= now.Year).ToArray();
 
                 if (!years.Any())
                 {
                     return null;
                 }
-                else
+                else if (next.Year != years.First())
                 {
-                    next = next.AddYears(years.First() - next.Year);
+                    next = new DateTime(years.First(), 1, 1);
                 }
-
-                timeUpdated = true;
             }
 
             if (_months.Any())
             {
                 var months = _months.Where(m => m > now.Month).ToArray();
 
+                int fullMonthsToNext;
                 if (!months.Any())
                 {
-                    next = next.AddYears(1);
-                    next = next.AddMonths(_months.First() - 1);
+                    fullMonthsToNext = 11 - next.Month + _months.First();
                 }
                 else
                 {
-                    next = next.AddMonths(months.First() - 1);
+                    fullMonthsToNext = months.First() - next.Month - 1;
                 }
+                next = next.AddMonths(fullMonthsToNext);
 
-                timeUpdated = true;
-            }
-            else if (!timeUpdated)
-            {
-                next = next.AddMonths(now.Month - 1);
+                var fullDaysToNext = 0;
+                while (next.AddDays(fullDaysToNext).Day != 1)
+                {
+                    fullDaysToNext++;
+                }
+                fullDaysToNext--;
+                next = next.AddDays(fullDaysToNext);
+                next = next.AddHours(23 - next.Hour);
+                next = next.AddMinutes(60 - next.Minute);
             }
 
             if (_daysOfMonth.Any())
             {
                 var daysOfMonth = _daysOfMonth.Where(m => m > now.Day).ToArray();
 
+                var fullDaysToNext = 0;
                 if (!daysOfMonth.Any())
                 {
-                    next = next.AddMonths(1);
-                    next = next.AddDays(_daysOfMonth.First() - next.Day);
+                    var nextDay = _daysOfMonth.First();
+                    while (next.AddDays(fullDaysToNext).Day != nextDay)
+                    {
+                        fullDaysToNext++;
+                    }
+                    fullDaysToNext--;
                 }
                 else
                 {
-                    next = next.AddDays(daysOfMonth.First() - next.Day);
+                    fullDaysToNext = daysOfMonth.First() - next.Day - 1;
                 }
-
-                timeUpdated = true;
-            }
-            else if (!timeUpdated)
-            {
-                next = next.AddDays(now.Day - 1);
+                next = next.AddDays(fullDaysToNext);
+                next = next.AddHours(23 - next.Hour);
+                next = next.AddMinutes(60 - next.Minute);
             }
 
             if (_hours.Any())
             {
-                var hours = _hours.Where(m => m > now.Hour).ToArray();
+                var hours = _hours.Where(m => m >= now.Hour).ToArray();
 
+                int fullHoursToNext;
                 if (!hours.Any())
                 {
-                    next = next.AddDays(1);
-                    next = next.AddHours(_hours.First());
+                    fullHoursToNext = 23 - next.Hour + _hours.First();
                 }
                 else
                 {
-                    next = next.AddHours(hours.First());
+                    fullHoursToNext = hours.First() - next.Hour - 1;
                 }
-            }
-            else if (!timeUpdated)
-            {
-                next = next.AddHours(now.Hour);
+
+                next = next.AddHours(fullHoursToNext);
+                next = next.AddMinutes(60 - next.Minute);
             }
 
             if (_minutes.Any())
             {
-                var minutes = _minutes.Where(m => m > now.Minute).ToArray();
+                var minutes = _minutes.Where(m => m >= now.Minute).ToArray();
 
                 if (!minutes.Any())
                 {
-                    next = next.AddHours(1);
-                    next = next.AddMinutes(_minutes.First());
+                    next = next.AddMinutes(60 - now.Minute + _minutes.First());
                 }
-                else if (!timeUpdated)
+                else if (next.Minute != minutes.First())
                 {
-                    next = next.AddMinutes(minutes.First());
+                    next = new DateTime(next.Year, next.Month, next.Day, next.Hour, minutes.First(), 0);
                 }
             }
 
