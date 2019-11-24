@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Rinsen.CronScheduler
 {
-    public class Scheduler
+    public class Scheduler : IScheduler
     {
         private readonly List<ScheduledTask> _scheduledTasks = new List<ScheduledTask>();
         private readonly CronParser _cronParser;
@@ -27,26 +27,39 @@ namespace Rinsen.CronScheduler
             _logger = logger;
         }
 
-        public ScheduledTask ScheduleTask(string cronExpression, Func<CancellationToken, Task> func)
+        public void ScheduleTask(Guid id, string cronExpression, Func<CancellationToken, Task> func)
         {
             var expression = _cronParser.Parse(cronExpression);
 
-            var scheduledTask = new ScheduledTask(expression, func);
+            var scheduledTask = new ScheduledTask(id, expression, func);
 
             _scheduledTasks.Add(scheduledTask);
+        }
+        public Guid ScheduleTask(string cronExpression, Func<CancellationToken, Task> func)
+        {
+            var id = Guid.NewGuid();
 
-            return scheduledTask;
+            ScheduleTask(id, cronExpression, func);
+
+            return id;
+        }
+
+        public void ScheduleTask(Guid id, string cronExpression, Action<CancellationToken> action)
+        {
+            var expression = _cronParser.Parse(cronExpression);
+
+            var scheduledTask = new ScheduledTask(id, expression, action);
+
+            _scheduledTasks.Add(scheduledTask);
         }
 
         public Guid ScheduleTask(string cronExpression, Action<CancellationToken> action)
         {
-            var expression = _cronParser.Parse(cronExpression);
+            var id = Guid.NewGuid();
 
-            var scheduledTask = new ScheduledTask(expression, action);
+            ScheduleTask(id, cronExpression, action);
 
-            _scheduledTasks.Add(scheduledTask);
-
-            return scheduledTask.Id;
+            return id;
         }
 
         public async Task RunAsync(CancellationToken cancellationToken)
@@ -143,7 +156,17 @@ namespace Rinsen.CronScheduler
             ResetScheduler();
         }
 
-        public void ResetScheduler()
+        public void ChangeSchedulesAndResetScheduler(IEnumerable<ScheduleItem> scheduleChanges)
+        {
+            foreach (var scheduleItem in scheduleChanges)
+            {
+                _scheduledTasks.Single(t => t.Id == scheduleItem.Id).SetCronExpression(_cronParser.Parse(scheduleItem.CronExpression));
+            }
+
+            ResetScheduler();
+        }
+
+        private void ResetScheduler()
         {
             _localCancellationTokenSource.Cancel();
 

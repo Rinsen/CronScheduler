@@ -9,26 +9,28 @@ namespace Rinsen.CronScheduler
     public class ScheduledTask
     {
 
-        public ScheduledTask(CronExpression cronExpression, Action<CancellationToken> action)
+        public ScheduledTask(Guid id, CronExpression cronExpression, Action<CancellationToken> action)
         {
+            Id = id;
             CronExpression = cronExpression;
             Action = action;
         }
 
-        public ScheduledTask(CronExpression cronExpression, Func<CancellationToken, Task> action)
+        public ScheduledTask(Guid id, CronExpression cronExpression, Func<CancellationToken, Task> action)
         {
+            Id = id;
             CronExpression = cronExpression;
             ActionTask = action;
         }
 
-        public void SetCronExpression(CronExpression cronExpression)
+        internal void SetCronExpression(CronExpression cronExpression)
         {
             CronExpression = cronExpression;
         }
 
-        public Guid Id { get; } = Guid.NewGuid();
+        public Guid Id { get; }
         public CronExpression CronExpression { get; private set; }
-        public Action<CancellationToken> Action { get; }
-        public Func<CancellationToken, Task> ActionTask { get; }
+        internal Action<CancellationToken> Action { get; }
+        internal Func<CancellationToken, Task> ActionTask { get; }
     }
 }

@@ -224,6 +224,36 @@ namespace Rinsen.CronScheduler.Tests
         }
 
         [Fact]
+        public async Task ScheduleJobThatShouldRunInNextMinuteButChangeThatBeforeThatSoNoExecutionHaveOccuredWithExternalId()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.SetupSequence(mock => mock.GetNow())
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 58))
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 59));
+            var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
+
+            var id = Guid.NewGuid();
+            var actionObject = new ActionObject();
+            scheduler.ScheduleTask(id, "44 14 * * * 2019", (cancellationToken) => {
+                actionObject.DoWork();
+            });
+
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
+            {
+                var task = Task.Run(async () =>
+                {
+                    await scheduler.RunAsync(cancellationTokenSource.Token);
+                });
+
+                scheduler.ChangeScheduleAndResetScheduler(id, "50 14 * * * 2019");
+
+                await task;
+            }
+
+            Assert.False(actionObject.Modified);
+        }
+
+        [Fact]
         public async Task ScheduleJobThatShouldRunInNextMinuteButStopSchedulerBeforeThatSoNoExecutionHaveOccured()
         {
             var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
