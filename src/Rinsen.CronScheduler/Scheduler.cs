@@ -15,6 +15,8 @@ namespace Rinsen.CronScheduler
         private readonly ICronDateTimeService _cronDateTimeService;
         private readonly ILogger<Scheduler> _logger;
         private readonly TimeSpan MINUTE = new TimeSpan(0, 1, 0);
+        private CancellationTokenSource _localCancellationTokenSource = new CancellationTokenSource();
+        private CancellationToken _externalCancellationToken;
 
         public Scheduler(CronParser cronParser,
             ICronDateTimeService cronDateTimeService,
@@ -25,7 +27,7 @@ namespace Rinsen.CronScheduler
             _logger = logger;
         }
 
-        public ScheduledTask ScheduleTask(string cronExpression, Func<Task> func)
+        public ScheduledTask ScheduleTask(string cronExpression, Func<CancellationToken, Task> func)
         {
             var expression = _cronParser.Parse(cronExpression);
 
@@ -36,7 +38,7 @@ namespace Rinsen.CronScheduler
             return scheduledTask;
         }
 
-        public ScheduledTask ScheduleTask(string cronExpression, Action action)
+        public Guid ScheduleTask(string cronExpression, Action<CancellationToken> action)
         {
             var expression = _cronParser.Parse(cronExpression);
 
@@ -44,38 +46,23 @@ namespace Rinsen.CronScheduler
 
             _scheduledTasks.Add(scheduledTask);
 
-            return scheduledTask;
+            return scheduledTask.Id;
         }
 
         public async Task RunAsync(CancellationToken cancellationToken)
         {
+            _externalCancellationToken = cancellationToken;
+            _externalCancellationToken.Register(() => _localCancellationTokenSource.Cancel());
             List<Guid> lowestIds = new List<Guid>();
-            DateTime lowestNextTimeToRun = DateTime.MaxValue;
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                foreach (var scheduledTask in _scheduledTasks)
-                {
-                    var nextTimeToRun = scheduledTask.CronExpression.GetNextTimeToRun();
-
-                    if (nextTimeToRun == default)
-                        continue;
-
-                    if (nextTimeToRun < lowestNextTimeToRun)
-                    {
-                        lowestIds.Clear();
-                        lowestIds.Add(scheduledTask.Id);
-                        lowestNextTimeToRun = (DateTime)nextTimeToRun;
-                    }
-                    else if (nextTimeToRun == lowestNextTimeToRun)
-                    {
-                        lowestIds.Add(scheduledTask.Id);
-                    }
-                }
+                var lowestNextTimeToRun = GetScheduledTasksToRunAndHowLongToWait(lowestIds);
 
                 var timeToWait = lowestNextTimeToRun.Subtract(_cronDateTimeService.GetNow());
 
-                var continueExecution = await Task.Delay((int)Math.Min(int.MaxValue, timeToWait.TotalMilliseconds), cancellationToken).ContinueWith(task => {
+                var continueExecution = await Task.Delay((int)Math.Min(int.MaxValue, timeToWait.TotalMilliseconds), _localCancellationTokenSource.Token).ContinueWith(task =>
+                {
                     if (cancellationToken.IsCancellationRequested)
                     {
                         return false;
@@ -89,16 +76,19 @@ namespace Rinsen.CronScheduler
                 var startTime = _cronDateTimeService.GetNow();
                 foreach (var scheduledTask in _scheduledTasks.Where(m => lowestIds.Contains(m.Id)))
                 {
+                    if (_localCancellationTokenSource.IsCancellationRequested)
+                        break;
+
                     try
                     {
                         if (scheduledTask.Action is object)
                         {
-                            scheduledTask.Action.Invoke();
+                            scheduledTask.Action.Invoke(_localCancellationTokenSource.Token);
                         }
 
                         if (scheduledTask.ActionTask is object)
                         {
-                            await scheduledTask.ActionTask.Invoke();
+                            await scheduledTask.ActionTask.Invoke(_localCancellationTokenSource.Token);
                         }
                     }
                     catch (Exception e)
@@ -111,6 +101,58 @@ namespace Rinsen.CronScheduler
                     _logger.LogWarning("Execution took more than one minute");
                 }
             }
+        }
+
+        private DateTime GetScheduledTasksToRunAndHowLongToWait(List<Guid> lowestIds)
+        {
+            var lowestNextTimeToRun = DateTime.MaxValue;
+            lowestIds.Clear();
+
+            foreach (var scheduledTask in _scheduledTasks)
+            {
+                var nextTimeToRun = scheduledTask.CronExpression.GetNextTimeToRun();
+
+                if (nextTimeToRun == default)
+                    continue;
+
+                if (nextTimeToRun < lowestNextTimeToRun)
+                {
+                    lowestIds.Clear();
+                    lowestIds.Add(scheduledTask.Id);
+                    lowestNextTimeToRun = (DateTime)nextTimeToRun;
+                }
+                else if (nextTimeToRun == lowestNextTimeToRun)
+                {
+                    lowestIds.Add(scheduledTask.Id);
+                }
+            }
+
+            return lowestNextTimeToRun;
+        }
+
+        private void RegisterLocalCancelationToken()
+        {
+            _localCancellationTokenSource = new CancellationTokenSource();
+            _externalCancellationToken.Register(() => _localCancellationTokenSource.Cancel());
+        }
+
+        public void ChangeScheduleAndResetScheduler(Guid id, string cronExpression)
+        {
+            _scheduledTasks.Single(t => t.Id == id).SetCronExpression(_cronParser.Parse(cronExpression));
+
+            ResetScheduler();
+        }
+
+        public void ResetScheduler()
+        {
+            _localCancellationTokenSource.Cancel();
+
+            RegisterLocalCancelationToken();
+        }
+
+        public void Stop()
+        {
+            _localCancellationTokenSource.Cancel();
         }
     }
 }

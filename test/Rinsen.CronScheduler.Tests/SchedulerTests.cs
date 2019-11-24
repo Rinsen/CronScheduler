@@ -34,11 +34,11 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("* * * * * *", () => {
+            scheduler.ScheduleTask("* * * * * *", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
-            using (var cancellationTokenSource = new CancellationTokenSource(1000))
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
             {
                 await scheduler.RunAsync(cancellationTokenSource.Token);
             }
@@ -54,11 +54,11 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("* * * * * *", async () => {
+            scheduler.ScheduleTask("* * * * * *", async (cancellationToken) => {
                 await actionObject.DoWorkAsync();
             });
 
-            using (var cancellationTokenSource = new CancellationTokenSource(1000))
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
             {
                 await scheduler.RunAsync(cancellationTokenSource.Token);
             }
@@ -74,17 +74,17 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("* * * * * *", () => {
+            scheduler.ScheduleTask("* * * * * *", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
             var actionObject2 = new ActionObject();
-            scheduler.ScheduleTask("* * * * *", () => {
+            scheduler.ScheduleTask("* * * * *", (cancellationToken) => {
                 actionObject2.DoWork();
             });
 
             var actionObject3 = new ActionObject();
-            scheduler.ScheduleTask("* * * * *", async () => {
+            scheduler.ScheduleTask("* * * * *", async (cancellationToken) => {
                 await actionObject3.DoWorkAsync();
             });
 
@@ -106,7 +106,7 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("* * * * * 2018", () => {
+            scheduler.ScheduleTask("* * * * * 2018", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
@@ -129,7 +129,7 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("44 14 * * * 2019", () => {
+            scheduler.ScheduleTask("44 14 * * * 2019", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
@@ -142,7 +142,7 @@ namespace Rinsen.CronScheduler.Tests
         }
 
         [Fact]
-        public async Task ScheduleJobThatShouldRunInNextMinuteNutCancelBeforeThatSoNoExecutionHaveOccured()
+        public async Task ScheduleJobThatShouldRunInNextMinuteButCancelBeforeThatSoNoExecutionHaveOccured()
         {
             var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
             cronDateTimeServiceMock.SetupSequence(mock => mock.GetNow())
@@ -151,7 +151,7 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("44 14 * * * 2019", () => {
+            scheduler.ScheduleTask("44 14 * * * 2019", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
@@ -178,7 +178,7 @@ namespace Rinsen.CronScheduler.Tests
             var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, logger.Object);
 
             var actionObject = new ActionObject();
-            scheduler.ScheduleTask("44 14 * * * 2019", () => {
+            scheduler.ScheduleTask("44 14 * * * 2019", (cancellationToken) => {
                 actionObject.DoWork();
             });
 
@@ -193,6 +193,115 @@ namespace Rinsen.CronScheduler.Tests
                     It.IsAny<Exception>(),
                     (Func<It.IsAnyType, Exception, string>)It.IsAny<object>()), Times.Once);
         }
+
+        [Fact]
+        public async Task ScheduleJobThatShouldRunInNextMinuteButChangeThatBeforeThatSoNoExecutionHaveOccured()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.SetupSequence(mock => mock.GetNow())
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 58))
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 59));
+            var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
+
+            var actionObject = new ActionObject();
+            var id = scheduler.ScheduleTask("44 14 * * * 2019", (cancellationToken) => {
+                actionObject.DoWork();
+            });
+
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
+            {
+                var task = Task.Run(async () =>
+                {
+                    await scheduler.RunAsync(cancellationTokenSource.Token);
+                });
+
+                scheduler.ChangeScheduleAndResetScheduler(id, "50 14 * * * 2019");
+
+                await task;
+            }
+
+            Assert.False(actionObject.Modified);
+        }
+
+        [Fact]
+        public async Task ScheduleJobThatShouldRunInNextMinuteButStopSchedulerBeforeThatSoNoExecutionHaveOccured()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.SetupSequence(mock => mock.GetNow())
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 58))
+                .Returns(new DateTime(2019, 11, 06, 14, 43, 59));
+            var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, null);
+
+            var internalStopInvoked = false;
+            var actionObject = new ActionObject();
+            var id = scheduler.ScheduleTask("44 14 * * * 2019", async (cancellationToken) => {
+                var continueExecutionAfterDelay = await Task.Delay(10000, cancellationToken).ContinueWith(task =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (!continueExecutionAfterDelay)
+                {
+                    internalStopInvoked = true;
+                    return;
+                }
+
+                actionObject.DoWork();
+            });
+
+            using (var cancellationTokenSource = new CancellationTokenSource(3100))
+            {
+                var task = Task.Run(async () =>
+                {
+                    await scheduler.RunAsync(cancellationTokenSource.Token);
+                });
+
+                await Task.Delay(2000);
+
+                scheduler.Stop();
+
+                await task;
+            }
+
+            Assert.True(internalStopInvoked);
+            Assert.False(actionObject.Modified);
+        }
+
+        [Fact]
+        public async Task ScheduleAsyncJobsAndOneWillFailTheOtherWillStillRunAndLogWillBeCreated()
+        {
+            var cronDateTimeServiceMock = new Mock<ICronDateTimeService>();
+            cronDateTimeServiceMock.Setup(mock => mock.GetNow()).Returns(new DateTime(2019, 11, 06, 14, 43, 59));
+            var logger = new Mock<ILogger<Scheduler>>();
+
+            var scheduler = new Scheduler(new CronParser(cronDateTimeServiceMock.Object), cronDateTimeServiceMock.Object, logger.Object);
+
+            var actionObject = new ActionObject();
+            scheduler.ScheduleTask("* * * * * *", async (cancellationToken) => {
+                await actionObject.DoWorkAsync();
+            });
+
+            scheduler.ScheduleTask("* * * * * *", (cancellationToken) => {
+                throw new Exception("Fail!!");
+            });
+
+            using (var cancellationTokenSource = new CancellationTokenSource(1100))
+            {
+                await scheduler.RunAsync(cancellationTokenSource.Token);
+            }
+
+            Assert.True(actionObject.Modified);
+            logger.Verify(x => x.Log(LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((o, t) => string.Equals("Failed to execute action", o.ToString(), StringComparison.InvariantCultureIgnoreCase)),
+                    It.IsAny<Exception>(),
+                    (Func<It.IsAnyType, Exception, string>)It.IsAny<object>()), Times.Once);
+        }
+
     }
 
     public class ActionObject
